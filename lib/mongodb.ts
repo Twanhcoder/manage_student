@@ -48,7 +48,7 @@ export const COLLECTIONS = {
   STUDENTS: "Students",
   TEACHERS: "Teachers",
   SUBJECTS: "Subjects",
-  CLASSES: "ClassList",
+  CLASSES: "ClastList",
   ATTENDANCE: "Attendance",
   SCHEDULES: "ClassSchedules",
 } as const;

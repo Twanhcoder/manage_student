@@ -6,14 +6,6 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
-// Class interfaces
-export interface Class extends Document {
-  _id?: ObjectId;
-  className: string;
-  grade: number;
-  section: string;
-}
-
 // Student interfaces
 export interface Student extends Document {
   id: string;
@@ -119,6 +111,20 @@ export interface CreateAttendanceRequest {
   notes?: string;
 }
 
+// Class interfaces
+export interface Class extends Document {
+  _id?: ObjectId;
+  className: string;
+  grade: number;
+  section: string;
+}
+
+export interface CreateClassRequest {
+  className: string;
+  grade: number;
+  section: string;
+}
+
 // Schedule interfaces
 export interface Period {
   period: number;
@@ -139,6 +145,12 @@ export interface ClassSchedule extends Document {
   schedule: DaySchedule[];
   academicYear: string;
   createdAt: string;
+}
+
+export interface CreateClassScheduleRequest {
+  class: string;
+  schedule: DaySchedule[];
+  academicYear: string;
 }
 
 export interface DashboardStats {
