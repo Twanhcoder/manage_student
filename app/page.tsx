@@ -1,103 +1,162 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import React, { useState } from 'react';
+import Dashboard from '@/components/Dashboard/Dashboard';
+import StudentList from '@/components/Students/StudentList';
+import SubjectList from '@/components/Subjects/SubjectList';
+import Charts from '@/components/Dashboard/Charts';
+import Sidebar from '@/components/Layout/Sidebar';
+import Header from '@/components/Layout/Header';
+import StudentForm from '@/components/Students/StudentForm';
+import SubjectForm from '@/components/Subjects/SubjectForm';
+import { Student, Subject } from '@/lib/types';
+import { useStudents } from '@/hooks/useStudents';
+import { useSubjects } from '@/hooks/useSubjects';
+
+function App() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showStudentForm, setShowStudentForm] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | undefined>();
+  const [showSubjectForm, setShowSubjectForm] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | undefined>();
+
+  const { students, addStudent, updateStudent, deleteStudent } = useStudents();
+  const { subjects, addSubject, updateSubject, deleteSubject, getSubjectsByIds } = useSubjects();
+
+  const handleAddStudent = () => {
+    setEditingStudent(undefined);
+    setShowStudentForm(true);
+  };
+
+  const handleEditStudent = (student: Student) => {
+    setEditingStudent(student);
+    setShowStudentForm(true);
+  };
+
+  const handleSaveStudent = (studentData: Omit<Student, 'id' | 'createdAt'>) => {
+    if (editingStudent) {
+      updateStudent(editingStudent.id, studentData);
+    } else {
+      addStudent(studentData);
+    }
+    setShowStudentForm(false);
+    setEditingStudent(undefined);
+  };
+
+  const handleDeleteStudent = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this student?')) {
+      deleteStudent(id);
+    }
+  };
+
+  const handleAddSubject = () => {
+    setEditingSubject(undefined);
+    setShowSubjectForm(true);
+  };
+
+  const handleEditSubject = (subject: Subject) => {
+    setEditingSubject(subject);
+    setShowSubjectForm(true);
+  };
+
+  const handleSaveSubject = (subjectData: Omit<Subject, 'id' | 'createdAt'>) => {
+    if (editingSubject) {
+      updateSubject(editingSubject.id, subjectData);
+    } else {
+      addSubject(subjectData);
+    }
+    setShowSubjectForm(false);
+    setEditingSubject(undefined);
+  };
+
+  const handleDeleteSubject = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this subject?')) {
+      deleteSubject(id);
+    }
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return <Dashboard students={students} subjects={subjects} />;
+      case 'students':
+        return (
+          <StudentList
+            students={students}
+            onEdit={handleEditStudent}
+            onDelete={handleDeleteStudent}
+            onAdd={handleAddStudent}
+            getSubjectsByIds={getSubjectsByIds}
+          />
+        );
+      case 'subjects':
+        return (
+          <SubjectList
+            subjects={subjects}
+            onEdit={handleEditSubject}
+            onDelete={handleDeleteSubject}
+            onAdd={handleAddSubject}
+          />
+        );
+      case 'statistics':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Statistics</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">
+                Detailed analytics and insights about your students.
+              </p>
+            </div>
+            <Charts students={students} subjects={subjects} />
+          </div>
+        );
+      default:
+        return <Dashboard students={students} subjects={subjects} />;
+    }
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+      <div className="flex">
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isOpen={sidebarOpen}
+          setIsOpen={setSidebarOpen}
         />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+        <div className="flex-1 lg:ml-64">
+          <Header toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+
+          <main className="p-6">
+            {renderContent()}
+          </main>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+
+      <StudentForm
+        student={editingStudent}
+        onSave={handleSaveStudent}
+        onCancel={() => {
+          setShowStudentForm(false);
+          setEditingStudent(undefined);
+        }}
+        isOpen={showStudentForm}
+        availableSubjects={subjects.map(s => ({ id: s.id, name: s.name, code: s.code }))}
+      />
+
+      <SubjectForm
+        subject={editingSubject}
+        onSave={handleSaveSubject}
+        onCancel={() => {
+          setShowSubjectForm(false);
+          setEditingSubject(undefined);
+        }}
+        isOpen={showSubjectForm}
+      />
     </div>
   );
 }
+
+export default App;
