@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { Subject } from '../../lib/types';
+import { X, Loader2 } from 'lucide-react';
+import { Subject, CreateSubjectRequest } from '../../lib/types';
 
 interface SubjectFormProps {
   subject?: Subject;
-  onSave: (subject: Omit<Subject, 'id' | 'createdAt'>) => void;
+  onSave: (subject: CreateSubjectRequest | { id: string } & Partial<Subject>) => Promise<{ success: boolean; error?: string }>;
   onCancel: () => void;
   isOpen: boolean;
 }
@@ -20,6 +20,8 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const departments = [
     'Mathematics',
@@ -54,6 +56,7 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
       });
     }
     setErrors({});
+    setSubmitError(null);
   }, [subject, isOpen]);
 
   const validateForm = () => {
@@ -73,10 +76,31 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateForm()) {
-      onSave(formData);
+    
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const submitData = subject 
+        ? { id: subject.id, ...formData }
+        : formData as CreateSubjectRequest;
+      
+      const result = await onSave(submitData);
+      
+      if (result.success) {
+        onCancel(); // Close the form on success
+      } else {
+        setSubmitError(result.error || 'Failed to save subject');
+      }
+    } catch (err) {
+      setSubmitError('An unexpected error occurred');
+      console.error('Form submission error:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -88,6 +112,9 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
     }));
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    if (submitError) {
+      setSubmitError(null);
     }
   };
 
@@ -102,13 +129,20 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
           </h2>
           <button
             onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            disabled={isSubmitting}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {submitError && (
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-sm text-red-600 dark:text-red-400">{submitError}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -119,7 +153,8 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                disabled={isSubmitting}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 ${
                   errors.name
                     ? 'border-red-500 dark:border-red-500'
                     : 'border-gray-300 dark:border-gray-600'
@@ -138,7 +173,8 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
                 name="code"
                 value={formData.code}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                disabled={isSubmitting}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 ${
                   errors.code
                     ? 'border-red-500 dark:border-red-500'
                     : 'border-gray-300 dark:border-gray-600'
@@ -158,9 +194,10 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
                 name="credits"
                 value={formData.credits}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 min="1"
                 max="6"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 ${
                   errors.credits
                     ? 'border-red-500 dark:border-red-500'
                     : 'border-gray-300 dark:border-gray-600'
@@ -177,7 +214,8 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
                 name="department"
                 value={formData.department}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                disabled={isSubmitting}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 ${
                   errors.department
                     ? 'border-red-500 dark:border-red-500'
                     : 'border-gray-300 dark:border-gray-600'
@@ -200,7 +238,8 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
                 name="instructor"
                 value={formData.instructor}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                disabled={isSubmitting}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 ${
                   errors.instructor
                     ? 'border-red-500 dark:border-red-500'
                     : 'border-gray-300 dark:border-gray-600'
@@ -219,8 +258,9 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
               name="description"
               value={formData.description}
               onChange={handleChange}
+              disabled={isSubmitting}
               rows={4}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 ${
                 errors.description
                   ? 'border-red-500 dark:border-red-500'
                   : 'border-gray-300 dark:border-gray-600'
@@ -234,14 +274,17 @@ const SubjectForm: React.FC<SubjectFormProps> = ({ subject, onSave, onCancel, is
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center"
             >
+              {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {subject ? 'Update Subject' : 'Add Subject'}
             </button>
           </div>

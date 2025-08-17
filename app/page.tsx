@@ -9,7 +9,7 @@ import Sidebar from '@/components/Layout/Sidebar';
 import Header from '@/components/Layout/Header';
 import StudentForm from '@/components/Students/StudentForm';
 import SubjectForm from '@/components/Subjects/SubjectForm';
-import { Student, Subject } from '@/lib/types';
+import { CreateSubjectRequest, Student, Subject } from '@/lib/types';
 import { useStudents } from '@/hooks/useStudents';
 import { useSubjects } from '@/hooks/useSubjects';
 
@@ -22,7 +22,7 @@ function App() {
   const [editingSubject, setEditingSubject] = useState<Subject | undefined>();
 
   const { students, addStudent, updateStudent, deleteStudent } = useStudents();
-  const { subjects, addSubject, updateSubject, deleteSubject, getSubjectsByIds } = useSubjects();
+  const { subjects, loading, error, addSubject, updateSubject, deleteSubject, getSubjectsByIds, refresh, clearError } = useSubjects();
 
   const handleAddStudent = () => {
     setEditingStudent(undefined);
@@ -60,20 +60,19 @@ function App() {
     setShowSubjectForm(true);
   };
 
-  const handleSaveSubject = (subjectData: Omit<Subject, 'id' | 'createdAt'>) => {
-    if (editingSubject) {
-      updateSubject(editingSubject.id, subjectData);
+  const handleSaveSubject = async (data: CreateSubjectRequest | { id: string } & Partial<Subject>) => {
+    if ('id' in data) {
+      // Update existing subject
+      const { id, ...updateData } = data;
+      return await updateSubject(id, updateData);
     } else {
-      addSubject(subjectData);
+      // Create new subject
+      return await addSubject(data);
     }
-    setShowSubjectForm(false);
-    setEditingSubject(undefined);
   };
 
-  const handleDeleteSubject = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this subject?')) {
-      deleteSubject(id);
-    }
+  const handleDeleteSubject = async (id: string) => {
+    return await deleteSubject(id);
   };
 
   const renderContent = () => {
@@ -94,9 +93,13 @@ function App() {
         return (
           <SubjectList
             subjects={subjects}
+            loading={loading}
+            error={error}
             onEdit={handleEditSubject}
             onDelete={handleDeleteSubject}
             onAdd={handleAddSubject}
+            onRefresh={refresh}
+            onClearError={clearError}
           />
         );
       case 'statistics':

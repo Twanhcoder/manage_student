@@ -1,32 +1,50 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Edit, 
-  Trash2, 
+import {
+  Search,
+  Filter,
+  Edit,
+  Trash2,
   Download,
   Plus,
   ChevronLeft,
   ChevronRight,
   BookOpen,
-  User
+  User,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  X
 } from 'lucide-react';
 import { Subject } from '../../lib/types';
 import { formatDate } from '@/lib/utils/dateUtils';
 
 interface SubjectListProps {
   subjects: Subject[];
+  loading: boolean;
+  error: string | null;
   onEdit: (subject: Subject) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<{ success: boolean; error?: string }>;
   onAdd: () => void;
+  onRefresh: () => void;
+  onClearError: () => void;
 }
 
-const SubjectList: React.FC<SubjectListProps> = ({ subjects, onEdit, onDelete, onAdd }) => {
+const SubjectList: React.FC<SubjectListProps> = ({
+  subjects,
+  loading,
+  error,
+  onEdit,
+  onDelete,
+  onAdd,
+  onRefresh,
+  onClearError
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [subjectsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const departments = useMemo(() => {
     const depts = [...new Set(subjects.map(subject => subject.department))];
@@ -35,13 +53,13 @@ const SubjectList: React.FC<SubjectListProps> = ({ subjects, onEdit, onDelete, o
 
   const filteredSubjects = useMemo(() => {
     return subjects.filter(subject => {
-      const matchesSearch = 
+      const matchesSearch =
         subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         subject.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         subject.instructor.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       const matchesDepartment = !selectedDepartment || subject.department === selectedDepartment;
-      
+
       return matchesSearch && matchesDepartment;
     });
   }, [subjects, searchTerm, selectedDepartment]);
@@ -56,28 +74,105 @@ const SubjectList: React.FC<SubjectListProps> = ({ subjects, onEdit, onDelete, o
     setCurrentPage(1);
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this subject? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const result = await onDelete(id);
+      if (!result.success) {
+        alert(result.error || 'Failed to delete subject');
+      }
+    } catch (err) {
+      alert('An unexpected error occurred while deleting the subject');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Name', 'Code', 'Credits', 'Instructor', 'Department', 'Description', 'Created At'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredSubjects.map(subject => [
+        `"${subject.name}"`,
+        subject.code,
+        subject.credits,
+        `"${subject.instructor}"`,
+        `"${subject.department}"`,
+        `"${subject.description}"`,
+        subject.createdAt
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `subjects_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
       {/* Header */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Subjects</h2>
-          
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Subjects</h2>
+            {loading && <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />}
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-3">
             <button
+              onClick={onRefresh}
+              disabled={loading}
+              className="flex items-center justify-center px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+
+            <button
               onClick={onAdd}
-              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={loading}
+              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Subject
             </button>
-            
-            <button className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+
+            <button
+              onClick={handleExportCSV}
+              disabled={filteredSubjects.length === 0}
+              className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
               <Download className="w-4 h-4 mr-2" />
               Export CSV
             </button>
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+            <button
+              onClick={onClearError}
+              className="text-red-400 hover:text-red-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Search and Filters */}
         <div className="mt-4 space-y-4">
@@ -89,13 +184,15 @@ const SubjectList: React.FC<SubjectListProps> = ({ subjects, onEdit, onDelete, o
                 placeholder="Search by name, code, or instructor..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                disabled={loading}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50"
               />
             </div>
-            
+
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              disabled={loading}
+              className="flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
               <Filter className="w-4 h-4 mr-2" />
               Filters
@@ -107,17 +204,19 @@ const SubjectList: React.FC<SubjectListProps> = ({ subjects, onEdit, onDelete, o
               <select
                 value={selectedDepartment}
                 onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={loading}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
               >
                 <option value="">All Departments</option>
                 {departments.map(dept => (
                   <option key={dept} value={dept}>{dept}</option>
                 ))}
               </select>
-              
+
               <button
                 onClick={clearFilters}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                disabled={loading}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors disabled:opacity-50"
               >
                 Clear Filters
               </button>
@@ -141,57 +240,81 @@ const SubjectList: React.FC<SubjectListProps> = ({ subjects, onEdit, onDelete, o
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {paginatedSubjects.map((subject) => (
-              <tr key={subject.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
-                      <BookOpen className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">{subject.name}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">{subject.description}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
-                    {subject.code}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{subject.credits}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <User className="w-4 h-4 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-900 dark:text-white">{subject.instructor}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full">
-                    {subject.department}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                  {formatDate(subject.createdAt)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => onEdit(subject)}
-                      className="text-blue-600 hover:text-blue-900 transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(subject.id)}
-                      className="text-red-600 hover:text-red-900 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+            {loading && subjects.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-12 text-center">
+                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">Loading subjects...</p>
                 </td>
               </tr>
-            ))}
+            ) : paginatedSubjects.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-12 text-center">
+                  <BookOpen className="w-8 h-8 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">
+                    {searchTerm || selectedDepartment ? 'No subjects match your filters' : 'No subjects found'}
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              paginatedSubjects.map((subject) => (
+                <tr key={subject.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                        <BookOpen className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{subject.name}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">{subject.description}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
+                      {subject.code}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{subject.credits}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <User className="w-4 h-4 text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-900 dark:text-white">{subject.instructor}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full">
+                      {subject.department}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {formatDate(subject.createdAt)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => onEdit(subject)}
+                        disabled={loading || deletingId === subject.id}
+                        className="text-blue-600 hover:text-blue-900 transition-colors disabled:opacity-50"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(subject.id)}
+                        disabled={loading || deletingId !== null}
+                        className="text-red-600 hover:text-red-900 transition-colors disabled:opacity-50 flex items-center"
+                      >
+                        {deletingId === subject.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -206,7 +329,7 @@ const SubjectList: React.FC<SubjectListProps> = ({ subjects, onEdit, onDelete, o
             <div className="flex space-x-2">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
+                disabled={currentPage === 1 || loading}
                 className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -215,18 +338,18 @@ const SubjectList: React.FC<SubjectListProps> = ({ subjects, onEdit, onDelete, o
                 <button
                   key={page}
                   onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1 border rounded transition-colors ${
-                    currentPage === page
+                  disabled={loading}
+                  className={`px-3 py-1 border rounded transition-colors disabled:opacity-50 ${currentPage === page
                       ? 'bg-blue-600 text-white border-blue-600'
                       : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   {page}
                 </button>
               ))}
               <button
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
+                disabled={currentPage === totalPages || loading}
                 className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
