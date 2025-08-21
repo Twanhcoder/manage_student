@@ -4,6 +4,8 @@ import {
   Users, 
   BarChart3, 
   BookOpen,
+  UserCheck,
+  Calendar,
   Menu,
   X
 } from 'lucide-react';
@@ -20,6 +22,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setI
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'students', icon: Users, label: 'Students' },
     { id: 'subjects', icon: BookOpen, label: 'Subjects' },
+    { id: 'teachers', icon: UserCheck, label: 'Teachers' },
+    { id: 'schedules', icon: Calendar, label: 'Schedules' },
     { id: 'statistics', icon: BarChart3, label: 'Statistics' }
   ];
 
